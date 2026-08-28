@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
-import { LivePresentation } from "@/components/presentation/LivePresentation";
-import { getPresentation } from "@/lib/presentation/store";
+import { LivePresentation } from "@/components/LivePresentation";
+import { getPresentation } from "@/lib/presentation";
 
 type StudentPageProps = { params: Promise<{ presentationId: string }> };
 

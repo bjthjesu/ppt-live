@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { createPresentation } from "@/lib/presentation/store";
+import { createPresentation } from "@/lib/presentation";
 
 export async function POST(request: Request) {
   const formData = await request.formData();

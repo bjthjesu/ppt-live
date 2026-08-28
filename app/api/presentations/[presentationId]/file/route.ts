@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getPresentationFile } from "@/lib/presentation/store";
+import { getPresentationFile } from "@/lib/presentation";
 
 type FileRouteProps = { params: Promise<{ presentationId: string }> };
 

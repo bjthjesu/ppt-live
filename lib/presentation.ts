@@ -1,8 +1,25 @@
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
-import type { Presentation, StoredPresentation } from "./types";
+
+export type Presentation = {
+  id: string;
+  fileName: string;
+  currentSlide: number;
+  slideCount: number;
+};
+
+type StoredPresentation = Presentation & { fileData: Uint8Array };
+
+export type SlideChangedEvent = {
+  type: "SLIDE_CHANGED";
+  presentationId: string;
+  slideNumber: number;
+};
+
+type Listener = (event: SlideChangedEvent) => void;
 
 const dataDirectory = path.join(process.cwd(), ".data", "presentations");
+const listeners = new Map<string, Set<Listener>>();
 
 function presentationPath(id: string): string {
   return path.join(dataDirectory, `${id}.json`);
@@ -15,13 +32,15 @@ function filePath(id: string): string {
 function readPresentation(id: string): StoredPresentation | undefined {
   try {
     const presentation = JSON.parse(readFileSync(presentationPath(id), "utf8")) as Presentation;
-    return {
-      ...presentation,
-      fileData: new Uint8Array(readFileSync(filePath(id))),
-    };
+    return { ...presentation, fileData: new Uint8Array(readFileSync(filePath(id))) };
   } catch {
     return undefined;
   }
+}
+
+function toPublicPresentation(presentation: StoredPresentation): Presentation {
+  const { fileData: _fileData, ...publicPresentation } = presentation;
+  return publicPresentation;
 }
 
 function writePresentation(presentation: StoredPresentation): void {
@@ -30,18 +49,9 @@ function writePresentation(presentation: StoredPresentation): void {
   writeFileSync(filePath(presentation.id), presentation.fileData);
 }
 
-function createId(): string {
-  return crypto.randomUUID().replaceAll("-", "").slice(0, 8);
-}
-
-export function createPresentation(
-  fileName: string,
-  fileData: Uint8Array,
-  slideCount: number,
-): Presentation {
-  const id = createId();
+export function createPresentation(fileName: string, fileData: Uint8Array, slideCount: number): Presentation {
   const presentation: StoredPresentation = {
-    id,
+    id: crypto.randomUUID().replaceAll("-", "").slice(0, 8),
     fileName,
     currentSlide: 1,
     slideCount,
@@ -60,36 +70,33 @@ export function getPresentationFile(id: string): Uint8Array | undefined {
   return readPresentation(id)?.fileData;
 }
 
-export function updateCurrentSlide(
-  id: string,
-  currentSlide: number,
-): Presentation | undefined {
+export function updateCurrentSlide(id: string, currentSlide: number): Presentation | undefined {
   const presentation = readPresentation(id);
   if (!presentation) return undefined;
-
-  presentation.currentSlide = Math.min(
-    Math.max(currentSlide, 1),
-    presentation.slideCount,
-  );
+  presentation.currentSlide = Math.min(Math.max(currentSlide, 1), presentation.slideCount);
   writePresentation(presentation);
   return toPublicPresentation(presentation);
 }
 
-export function updateSlideCount(
-  id: string,
-  slideCount: number,
-): Presentation | undefined {
+export function updateSlideCount(id: string, slideCount: number): Presentation | undefined {
   const presentation = readPresentation(id);
   if (!presentation) return undefined;
-
   presentation.slideCount = Math.max(1, slideCount);
   presentation.currentSlide = Math.min(presentation.currentSlide, presentation.slideCount);
   writePresentation(presentation);
   return toPublicPresentation(presentation);
 }
 
-function toPublicPresentation(presentation: StoredPresentation): Presentation {
-  const { fileData, ...publicPresentation } = presentation;
-  void fileData;
-  return publicPresentation;
+export function subscribeToPresentation(id: string, listener: Listener): () => void {
+  const presentationListeners = listeners.get(id) ?? new Set<Listener>();
+  presentationListeners.add(listener);
+  listeners.set(id, presentationListeners);
+  return () => {
+    presentationListeners.delete(listener);
+    if (presentationListeners.size === 0) listeners.delete(id);
+  };
+}
+
+export function publishSlideChange(event: SlideChangedEvent): void {
+  listeners.get(event.presentationId)?.forEach((listener) => listener(event));
 }

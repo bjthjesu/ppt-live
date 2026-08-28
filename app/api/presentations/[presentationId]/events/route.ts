@@ -1,5 +1,4 @@
-import { getPresentation } from "@/lib/presentation/store";
-import { subscribeToPresentation } from "@/lib/presentation/events";
+import { getPresentation, subscribeToPresentation } from "@/lib/presentation";
 
 type EventsRouteProps = { params: Promise<{ presentationId: string }> };
 

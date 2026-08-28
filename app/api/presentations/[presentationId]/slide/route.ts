@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
-import { publishSlideChange } from "@/lib/presentation/events";
-import { getPresentation, updateCurrentSlide, updateSlideCount } from "@/lib/presentation/store";
+import { getPresentation, publishSlideChange, updateCurrentSlide, updateSlideCount } from "@/lib/presentation";
 
 type SlideRouteProps = { params: Promise<{ presentationId: string }> };
 
