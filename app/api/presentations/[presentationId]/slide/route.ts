@@ -4,6 +4,13 @@ import { getPresentation, updateCurrentSlide, updateSlideCount } from "@/lib/pre
 
 type SlideRouteProps = { params: Promise<{ presentationId: string }> };
 
+export async function GET(_request: Request, { params }: SlideRouteProps) {
+  const { presentationId } = await params;
+  const presentation = getPresentation(presentationId);
+  if (!presentation) return NextResponse.json({ error: "Presentation not found" }, { status: 404 });
+  return NextResponse.json({ presentation });
+}
+
 export async function PUT(request: Request, { params }: SlideRouteProps) {
   const { presentationId } = await params;
   const body = (await request.json()) as { slideNumber?: unknown; slideCount?: unknown };

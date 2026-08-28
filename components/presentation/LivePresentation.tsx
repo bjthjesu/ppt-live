@@ -16,7 +16,7 @@ export function LivePresentation({ presentation, mode }: LivePresentationProps) 
   const [copyState, setCopyState] = useState("Copy link");
   const studentUrl = typeof window === "undefined"
     ? `/presentation/${presentation.id}`
-    : `${window.location.origin}/presentation/${presentation.id}`;
+    : `${window.location.protocol}//${window.location.hostname}:3001/presentation/${presentation.id}`;
 
   useEffect(() => {
     const source = new EventSource(`/api/presentations/${presentation.id}/events`);
@@ -26,6 +26,21 @@ export function LivePresentation({ presentation, mode }: LivePresentationProps) 
     };
     return () => source.close();
   }, [presentation.id]);
+
+  useEffect(() => {
+    if (mode !== "student") return;
+    const syncCurrentSlide = async () => {
+      const response = await fetch(`/api/presentations/${presentation.id}/slide`, { cache: "no-store" });
+      if (!response.ok) return;
+      const result = (await response.json()) as { presentation?: Presentation };
+      if (result.presentation) {
+        setCurrentSlide(result.presentation.currentSlide);
+        setSlideCount(result.presentation.slideCount);
+      }
+    };
+    const interval = window.setInterval(() => void syncCurrentSlide(), 1000);
+    return () => window.clearInterval(interval);
+  }, [mode, presentation.id]);
 
   async function changeSlide(nextSlide: number) {
     const response = await fetch(`/api/presentations/${presentation.id}/slide`, {

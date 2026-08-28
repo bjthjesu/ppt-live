@@ -2,19 +2,19 @@ This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-
 
 ## Getting Started
 
-First, run the development server:
+Run the host server on port 3000:
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+npm run host
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Run the user server on port 3001 in a second terminal:
+
+```bash
+npm run user
+```
+
+Open [http://localhost:3000/host](http://localhost:3000/host) for the host and use the shared presentation link on port 3001 for users.
 
 You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
 

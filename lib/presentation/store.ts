@@ -1,13 +1,34 @@
+import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import path from "node:path";
 import type { Presentation, StoredPresentation } from "./types";
 
-type PresentationRuntime = typeof globalThis & {
-  __pptLivePresentations?: Map<string, StoredPresentation>;
-};
+const dataDirectory = path.join(process.cwd(), ".data", "presentations");
 
-const runtime = globalThis as PresentationRuntime;
-const presentations =
-  runtime.__pptLivePresentations ?? new Map<string, StoredPresentation>();
-runtime.__pptLivePresentations = presentations;
+function presentationPath(id: string): string {
+  return path.join(dataDirectory, `${id}.json`);
+}
+
+function filePath(id: string): string {
+  return path.join(dataDirectory, `${id}.pptx`);
+}
+
+function readPresentation(id: string): StoredPresentation | undefined {
+  try {
+    const presentation = JSON.parse(readFileSync(presentationPath(id), "utf8")) as Presentation;
+    return {
+      ...presentation,
+      fileData: new Uint8Array(readFileSync(filePath(id))),
+    };
+  } catch {
+    return undefined;
+  }
+}
+
+function writePresentation(presentation: StoredPresentation): void {
+  mkdirSync(dataDirectory, { recursive: true });
+  writeFileSync(presentationPath(presentation.id), JSON.stringify(toPublicPresentation(presentation)));
+  writeFileSync(filePath(presentation.id), presentation.fileData);
+}
 
 function createId(): string {
   return crypto.randomUUID().replaceAll("-", "").slice(0, 8);
@@ -26,30 +47,31 @@ export function createPresentation(
     slideCount,
     fileData,
   };
-  presentations.set(id, presentation);
+  writePresentation(presentation);
   return toPublicPresentation(presentation);
 }
 
 export function getPresentation(id: string): Presentation | undefined {
-  const presentation = presentations.get(id);
+  const presentation = readPresentation(id);
   return presentation ? toPublicPresentation(presentation) : undefined;
 }
 
 export function getPresentationFile(id: string): Uint8Array | undefined {
-  return presentations.get(id)?.fileData;
+  return readPresentation(id)?.fileData;
 }
 
 export function updateCurrentSlide(
   id: string,
   currentSlide: number,
 ): Presentation | undefined {
-  const presentation = presentations.get(id);
+  const presentation = readPresentation(id);
   if (!presentation) return undefined;
 
   presentation.currentSlide = Math.min(
     Math.max(currentSlide, 1),
     presentation.slideCount,
   );
+  writePresentation(presentation);
   return toPublicPresentation(presentation);
 }
 
@@ -57,11 +79,12 @@ export function updateSlideCount(
   id: string,
   slideCount: number,
 ): Presentation | undefined {
-  const presentation = presentations.get(id);
+  const presentation = readPresentation(id);
   if (!presentation) return undefined;
 
   presentation.slideCount = Math.max(1, slideCount);
   presentation.currentSlide = Math.min(presentation.currentSlide, presentation.slideCount);
+  writePresentation(presentation);
   return toPublicPresentation(presentation);
 }
 
