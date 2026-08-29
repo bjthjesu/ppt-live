@@ -3,8 +3,8 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev:host": "cross-env PORT=3000 NEXT_DIST_DIR=.next-host next dev",
-    "dev:user": "cross-env PORT=3001 NEXT_DIST_DIR=.next-user next dev",
+    "dev:host": "cross-env PORT=5022 NEXT_DIST_DIR=.next-host next dev",
+    "dev:user": "cross-env PORT=5023 NEXT_DIST_DIR=.next-user next dev",
     "dev": "concurrently --kill-others-on-fail --names host,user --prefix-colors blue,green \"npm run dev:host\" \"npm run dev:user\"",
     "build": "next build",
     "start": "next start",
