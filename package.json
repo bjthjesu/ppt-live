@@ -1,0 +1,19 @@
+{
+  "name": "ppt-live",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "dev": "npm --prefix ppt-live run dev",
+    "dev:host": "npm --prefix ppt-live run dev:host",
+    "dev:user": "npm --prefix ppt-live run dev:user",
+    "build": "npm --prefix ppt-live run build",
+    "start": "npm --prefix ppt-live run start",
+    "lint": "npm --prefix ppt-live run lint",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs"
+}
