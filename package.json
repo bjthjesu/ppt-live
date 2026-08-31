@@ -5,7 +5,8 @@
   "scripts": {
     "dev:host": "cross-env PORT=5022 NEXT_DIST_DIR=.next-host next dev",
     "dev:user": "cross-env PORT=5023 NEXT_DIST_DIR=.next-user next dev",
-    "dev": "concurrently --kill-others-on-fail --names host,user --prefix-colors blue,green \"npm run dev:host\" \"npm run dev:user\"",
+    "dev:socket": "node socket-server.mjs",
+    "dev": "concurrently --kill-others-on-fail --names host,user,socket --prefix-colors blue,green,magenta \"npm run dev:host\" \"npm run dev:user\" \"npm run dev:socket\"",
     "build": "next build",
     "start": "next start",
     "lint": "eslint"
@@ -14,7 +15,9 @@
     "next": "16.3.3",
     "pptx-viewer": "^0.2.2",
     "react": "19.2.8",
-    "react-dom": "19.2.8"
+    "react-dom": "19.2.8",
+    "socket.io": "^4.8.3",
+    "socket.io-client": "^4.8.3"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",

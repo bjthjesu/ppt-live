@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
+import { io, type Socket } from "socket.io-client";
 import { PptViewer } from "@/components/PptViewer";
 import type { Presentation, SlideChangedEvent } from "@/lib/presentation";
 
@@ -11,29 +12,56 @@ export function LivePresentation({ presentation, mode }: LivePresentationProps) 
   const [currentSlide, setCurrentSlide] = useState(presentation.currentSlide);
   const [slideCount, setSlideCount] = useState(presentation.slideCount);
   const [copyState, setCopyState] = useState("Copy link");
-  const studentUrl = typeof window === "undefined" ? `/presentation/${presentation.id}` : `${window.location.protocol}//${window.location.hostname}:3001/presentation/${presentation.id}`;
+  const [studentUrl, setStudentUrl] = useState(`/presentation/${presentation.id}`);
+  const socketRef = useRef<Socket | null>(null);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    setStudentUrl(`${window.location.protocol}//${window.location.hostname}:5023/presentation/${presentation.id}`);
+  }, [presentation.id]);
 
   useEffect(() => {
     const source = new EventSource(`/api/presentations/${presentation.id}/events`);
-    source.onmessage = (message) => { const event = JSON.parse(message.data) as SlideChangedEvent; if (event.type === "SLIDE_CHANGED") setCurrentSlide(event.slideNumber); };
+    source.onmessage = (message) => {
+      const event = JSON.parse(message.data) as SlideChangedEvent;
+      if (event.type === "SLIDE_CHANGED") {
+        setCurrentSlide(event.slideNumber);
+      }
+    };
     return () => source.close();
   }, [presentation.id]);
 
   useEffect(() => {
-    if (mode !== "student") return;
-    const syncCurrentSlide = async () => {
-      const response = await fetch(`/api/presentations/${presentation.id}/slide`, { cache: "no-store" });
-      if (!response.ok) return;
-      const result = (await response.json()) as { presentation?: Presentation };
-      if (result.presentation) { setCurrentSlide(result.presentation.currentSlide); setSlideCount(result.presentation.slideCount); }
+    const socket = io("http://localhost:5024", { transports: ["websocket"] });
+    socketRef.current = socket;
+    socket.emit("join-presentation", presentation.id);
+
+    if (mode === "student") {
+      socket.on("slide-changed", async (event: { presentationId: string; slideNumber: number }) => {
+        if (event.presentationId !== presentation.id) return;
+        const response = await fetch(`/api/presentations/${presentation.id}/slide`, { cache: "no-store" });
+        if (!response.ok) return;
+        const result = (await response.json()) as { presentation?: Presentation };
+        if (!result.presentation) return;
+        setCurrentSlide(result.presentation.currentSlide);
+        setSlideCount(result.presentation.slideCount);
+      });
+    }
+
+    return () => {
+      socket.off("slide-changed");
+      socket.disconnect();
+      socketRef.current = null;
     };
-    const interval = window.setInterval(() => void syncCurrentSlide(), 1000);
-    return () => window.clearInterval(interval);
   }, [mode, presentation.id]);
 
   async function changeSlide(nextSlide: number) {
     const response = await fetch(`/api/presentations/${presentation.id}/slide`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ slideNumber: nextSlide }) });
-    if (response.ok) setCurrentSlide(nextSlide);
+    if (!response.ok) return;
+    const result = (await response.json()) as { presentation?: Presentation };
+    if (!result.presentation) return;
+    setCurrentSlide(result.presentation.currentSlide);
+    socketRef.current?.emit("slide-changed", { presentationId: presentation.id, slideNumber: result.presentation.currentSlide });
   }
 
   async function recordSlideCount(count: number) {
