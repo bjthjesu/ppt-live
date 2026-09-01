@@ -5,9 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { io, type Socket } from "socket.io-client";
 import { PptViewer } from "@/components/PptViewer";
-import type {
-  Presentation,
-} from "@/lib/presentation";
+import type { Presentation } from "@/lib/presentation";
 
 type LivePresentationProps = {
   presentation: Presentation;
@@ -37,43 +35,30 @@ export function LivePresentation({
   const [currentSlide, setCurrentSlide] = useState(
     initialPresentation.currentSlide
   );
-
   const [slideCount, setSlideCount] = useState(
     initialPresentation.slideCount
   );
-
   const [participantCount, setParticipantCount] = useState(
     initialPresentation.participantCount
   );
-
   const [copyState, setCopyState] = useState("Copy link");
-
   const [studentUrl, setStudentUrl] = useState(
     `/presentation/${initialPresentation.id}`
   );
-
   const [isFinished, setIsFinished] = useState(
     initialPresentation.status === "finished"
   );
-
   const [showConfirmFinish, setShowConfirmFinish] = useState(false);
   const [isFinishing, setIsFinishing] = useState(false);
-
   const [sessionId, setSessionId] = useState("");
 
   const socketRef = useRef<Socket | null>(null);
-
-  // Keep the latest finished state available to socket callbacks
-  // without recreating the socket connection.
   const isFinishedRef = useRef(isFinished);
 
   useEffect(() => {
     isFinishedRef.current = isFinished;
   }, [isFinished]);
 
-  // ------------------------------------------------------------
-  // Create / restore persistent session ID
-  // ------------------------------------------------------------
   useEffect(() => {
     if (typeof window === "undefined") return;
 
@@ -82,18 +67,13 @@ export function LivePresentation({
 
     if (stored) {
       setSessionId(stored);
-      return;
+    } else {
+      const newId = crypto.randomUUID();
+      setSessionId(newId);
+      localStorage.setItem(storageKey, newId);
     }
-
-    const newId = crypto.randomUUID();
-
-    setSessionId(newId);
-    localStorage.setItem(storageKey, newId);
   }, [initialPresentation.id]);
 
-  // ------------------------------------------------------------
-  // Build student URL
-  // ------------------------------------------------------------
   useEffect(() => {
     if (typeof window === "undefined") return;
 
@@ -102,13 +82,8 @@ export function LivePresentation({
     );
   }, [initialPresentation.id]);
 
-  // ------------------------------------------------------------
-  // Track student participant
-  // ------------------------------------------------------------
   useEffect(() => {
     if (!sessionId) return;
-
-    // Host should NOT be counted as a participant.
     if (mode === "host") return;
 
     let cancelled = false;
@@ -122,9 +97,7 @@ export function LivePresentation({
             headers: {
               "Content-Type": "application/json",
             },
-            body: JSON.stringify({
-              sessionId,
-            }),
+            body: JSON.stringify({ sessionId }),
           }
         );
 
@@ -137,9 +110,7 @@ export function LivePresentation({
         if (result.presentation) {
           setParticipantCount(result.presentation.participantCount);
         }
-      } catch {
-        // Ignore join errors.
-      }
+      } catch {}
     }
 
     void joinPresentation();
@@ -152,17 +123,12 @@ export function LivePresentation({
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({
-          sessionId,
-        }),
+        body: JSON.stringify({ sessionId }),
         keepalive: true,
       }).catch(() => {});
     };
   }, [initialPresentation.id, sessionId, mode]);
 
-  // ------------------------------------------------------------
-  // Socket.IO connection
-  // ------------------------------------------------------------
   useEffect(() => {
     if (!sessionId) return;
 
@@ -174,60 +140,32 @@ export function LivePresentation({
 
     socketRef.current = socket;
 
-    // ----------------------------------------------------------
-    // Participant count - host only
-    // ----------------------------------------------------------
     const handleParticipantCount = (
       event: ParticipantCountEvent
     ) => {
       if (mode !== "host") return;
-
-      if (event.presentationId !== initialPresentation.id) {
-        return;
-      }
+      if (event.presentationId !== initialPresentation.id) return;
 
       setParticipantCount(event.participantCount);
     };
 
-    // ----------------------------------------------------------
-    // Slide change - students only
-    // ----------------------------------------------------------
     const handleSlideChanged = (event: SlideChangedEvent) => {
       if (mode !== "student") return;
-
-      if (event.presentationId !== initialPresentation.id) {
-        return;
-      }
-
-      // Do not update slides after presentation has finished.
-      if (isFinishedRef.current) {
-        return;
-      }
+      if (event.presentationId !== initialPresentation.id) return;
+      if (isFinishedRef.current) return;
 
       setCurrentSlide(event.slideNumber);
     };
 
-    // ----------------------------------------------------------
-    // Presentation finished - host + students
-    // ----------------------------------------------------------
     const handlePresentationFinished = (
       event: PresentationFinishedEvent
     ) => {
-      if (event.presentationId !== initialPresentation.id) {
-        return;
-      }
+      if (event.presentationId !== initialPresentation.id) return;
 
       isFinishedRef.current = true;
       setIsFinished(true);
     };
 
-    socket.on("participant-count", handleParticipantCount);
-    socket.on("slide-changed", handleSlideChanged);
-    socket.on("presentation-finished", handlePresentationFinished);
-
-    // ----------------------------------------------------------
-    // Socket connected
-    // ----------------------------------------------------------
     const handleConnect = () => {
       socket.emit("join-presentation", {
         presentationId: initialPresentation.id,
@@ -244,10 +182,13 @@ export function LivePresentation({
     };
 
     socket.on("connect", handleConnect);
+    socket.on("participant-count", handleParticipantCount);
+    socket.on("slide-changed", handleSlideChanged);
+    socket.on(
+      "presentation-finished",
+      handlePresentationFinished
+    );
 
-    // ----------------------------------------------------------
-    // Cleanup
-    // ----------------------------------------------------------
     return () => {
       socket.off("connect", handleConnect);
       socket.off("participant-count", handleParticipantCount);
@@ -265,9 +206,6 @@ export function LivePresentation({
     };
   }, [mode, initialPresentation.id, sessionId]);
 
-  // ------------------------------------------------------------
-  // Host changes slide
-  // ------------------------------------------------------------
   async function changeSlide(nextSlide: number) {
     if (mode !== "host") return;
     if (isFinishedRef.current) return;
@@ -298,26 +236,15 @@ export function LivePresentation({
 
       const updatedSlide = result.presentation.currentSlide;
 
-      // Update host immediately.
       setCurrentSlide(updatedSlide);
 
-      // Notify all students through Socket.IO.
       socketRef.current?.emit("slide-changed", {
         presentationId: initialPresentation.id,
         slideNumber: updatedSlide,
       });
-    } catch {
-      // Ignore slide change errors.
-    }
+    } catch {}
   }
 
-  // ------------------------------------------------------------
-  // Record slide count
-  //
-  // IMPORTANT:
-  // Only HOST should update slide count.
-  // Students must NOT send this API request.
-  // ------------------------------------------------------------
   async function recordSlideCount(count: number) {
     if (mode !== "host") return;
     if (count <= 0) return;
@@ -338,14 +265,9 @@ export function LivePresentation({
           }),
         }
       );
-    } catch {
-      // Ignore slide count errors.
-    }
+    } catch {}
   }
 
-  // ------------------------------------------------------------
-  // Copy student link
-  // ------------------------------------------------------------
   async function copyLink() {
     try {
       if (navigator.clipboard?.writeText) {
@@ -373,9 +295,6 @@ export function LivePresentation({
     }
   }
 
-  // ------------------------------------------------------------
-  // Finish presentation
-  // ------------------------------------------------------------
   async function finishPresentation() {
     if (isFinishing) return;
     if (isFinishedRef.current) return;
@@ -398,28 +317,22 @@ export function LivePresentation({
         return;
       }
 
-      // Mark host as finished immediately.
       isFinishedRef.current = true;
       setIsFinished(true);
       setShowConfirmFinish(false);
 
-      // Notify all connected students.
       socketRef.current?.emit("finish-presentation", {
         presentationId: initialPresentation.id,
       });
 
       setIsFinishing(false);
 
-      // Return host to host dashboard.
       router.replace("/host");
     } catch {
       setIsFinishing(false);
     }
   }
 
-  // ------------------------------------------------------------
-  // Student finished screen
-  // ------------------------------------------------------------
   if (mode === "student" && isFinished) {
     return (
       <main className="grid h-screen place-items-center bg-[#17252c] px-6 text-center">
@@ -436,12 +349,8 @@ export function LivePresentation({
     );
   }
 
-  // ------------------------------------------------------------
-  // Main UI
-  // ------------------------------------------------------------
   return (
     <main className="mx-auto flex h-screen w-full max-w-6xl flex-col overflow-hidden px-5 sm:px-8">
-      {/* Header */}
       <header className="flex shrink-0 items-center justify-between py-3">
         <Link
           href="/"
@@ -458,12 +367,10 @@ export function LivePresentation({
                 : "bg-[#65d391]"
             }`}
           />
-
           {isFinished ? "Finished" : "Online"}
         </span>
       </header>
 
-      {/* Presentation information */}
       <section className="flex shrink-0 flex-col gap-2 pb-2">
         <div className="flex items-center justify-between gap-3">
           <div className="min-w-0 flex-1">
@@ -501,7 +408,6 @@ export function LivePresentation({
         )}
       </section>
 
-      {/* PPT viewer + host controls */}
       <section
         className={`flex min-h-0 flex-1 flex-col py-2 ${
           mode === "host"
@@ -509,7 +415,6 @@ export function LivePresentation({
             : ""
         }`}
       >
-        {/* PPT Viewer */}
         <div className="min-w-0">
           <PptViewer
             fileUrl={`/api/presentations/${initialPresentation.id}/file`}
@@ -522,11 +427,9 @@ export function LivePresentation({
           />
         </div>
 
-        {/* Host controls */}
         {mode === "host" && (
           <section className="flex flex-col justify-center gap-3 border-t border-[#31464e] pt-3 lg:border-l lg:border-t-0 lg:pl-4 lg:pt-0">
             <div className="flex flex-wrap gap-2">
-              {/* Previous */}
               <button
                 onClick={() =>
                   void changeSlide(currentSlide - 1)
@@ -539,7 +442,6 @@ export function LivePresentation({
                 Previous
               </button>
 
-              {/* Next */}
               <button
                 onClick={() =>
                   void changeSlide(currentSlide + 1)
@@ -553,7 +455,6 @@ export function LivePresentation({
                 Next
               </button>
 
-              {/* Finish */}
               <button
                 onClick={() =>
                   setShowConfirmFinish(true)
@@ -569,7 +470,6 @@ export function LivePresentation({
               </button>
             </div>
 
-            {/* Student link */}
             <div className="flex flex-col gap-1.5 text-xs">
               <span className="uppercase tracking-[0.14em] text-[#849ba2]">
                 Student link
@@ -591,7 +491,6 @@ export function LivePresentation({
         )}
       </section>
 
-      {/* Finish confirmation dialog */}
       {showConfirmFinish && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
           <div className="max-w-sm rounded-lg bg-[#17252c] p-5 shadow-lg">
@@ -605,7 +504,6 @@ export function LivePresentation({
             </p>
 
             <div className="flex gap-3">
-              {/* Cancel */}
               <button
                 onClick={() =>
                   setShowConfirmFinish(false)
@@ -616,7 +514,6 @@ export function LivePresentation({
                 Cancel
               </button>
 
-              {/* Confirm */}
               <button
                 onClick={() => void finishPresentation()}
                 disabled={isFinishing}
