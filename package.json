@@ -3,8 +3,8 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev:host": "cross-env PORT=5022 NEXT_DIST_DIR=.next-host next dev",
-    "dev:user": "cross-env PORT=5023 NEXT_DIST_DIR=.next-user next dev",
+    "dev:host": "cross-env PORT=5022 NEXT_DIST_DIR=.next-host next dev --hostname 0.0.0.0",
+    "dev:user": "cross-env PORT=5023 NEXT_DIST_DIR=.next-user next dev --hostname 0.0.0.0",
     "dev:socket": "node socket-server.mjs",
     "dev": "concurrently --kill-others-on-fail --names host,user,socket --prefix-colors blue,green,magenta \"npm run dev:host\" \"npm run dev:user\" \"npm run dev:socket\"",
     "build": "next build",

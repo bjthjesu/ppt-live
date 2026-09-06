@@ -74,6 +74,6 @@ io.on("connection", (socket) => {
 });
 
 const PORT = 5024;
-httpServer.listen(PORT, () => {
-  console.log(`Socket.IO server listening on http://localhost:${PORT}`);
+httpServer.listen(PORT, "0.0.0.0", () => {
+  console.log(`Socket.IO server listening on http://0.0.0.0:${PORT}`);
 });
